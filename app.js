@@ -15,15 +15,41 @@ async function peticion(url, opciones = {}) {
     return { status: res.status, datos: await res.json() };
 }
 
-// 2. Funciones de interfaz
+// Obtener los nuevos elementos del DOM
+const inputFiltro = document.querySelector('#input-filtro');
+const selectLimite = document.querySelector('#select-limite');
+
+// Actualizar crearTarjeta para cargar comentarios al hacer clic
 function crearTarjeta(post, esNuevo = false) {
     const art = document.createElement('article');
     art.className = esNuevo ? 'post nuevo' : 'post';
+    art.style.cursor = 'pointer'; // Indicador visual de click
     const h3 = document.createElement('h3');
     h3.textContent = `#${post.id} ${post.title}`;
     const p = document.createElement('p');
     p.textContent = post.body;
-    art.append(h3, p);
+    
+    const divComentarios = document.createElement('div');
+    art.append(h3, p, divComentarios);
+
+    // Evento para obtener comentarios
+    art.addEventListener('click', async () => {
+        if (divComentarios.innerHTML !== '') return; // Evita peticiones repetidas
+        divComentarios.innerHTML = '<hr><em>Cargando comentarios...</em>';
+        try {
+            const { datos } = await peticion(`${API}/posts/${post.id}/comments`);
+            divComentarios.innerHTML = '<hr><h4>Comentarios:</h4>';
+            datos.forEach(c => {
+                const commentEl = document.createElement('p');
+                commentEl.style.fontSize = '0.85em';
+                commentEl.innerHTML = `<strong>${c.email}</strong>: ${c.body}`;
+                divComentarios.append(commentEl);
+            });
+        } catch (error) {
+            divComentarios.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+        }
+    });
+
     return art;
 }
 
@@ -32,18 +58,25 @@ function mostrarEstado(texto, esError = false) {
     estado.className = esError ? 'error' : '';
 }
 
-// 3. GET: listar las publicaciones de un usuario
+// Actualizar evento del formulario para aplicar _limit y .filter()
 formBuscar.addEventListener('submit', async (e) => {
     e.preventDefault();
     const params = new URLSearchParams({
         userId: inputUsuario.value,
-        _limit: 5
+        _limit: selectLimite.value // Se lee el límite del <select>
     });
     mostrarEstado('Cargando...');
     try {
         const { status, datos } = await peticion(`${API}/posts?${params}`);
-        lista.replaceChildren(...datos.map(p => crearTarjeta(p)));
-        mostrarEstado(`GET ${status}: ${datos.length} publicaciones`);
+        
+        // Filtro por texto en el navegador
+        const textoBusqueda = inputFiltro.value.trim().toLowerCase();
+        const postsFiltrados = datos.filter(post => 
+            post.title.toLowerCase().includes(textoBusqueda)
+        );
+
+        lista.replaceChildren(...postsFiltrados.map(p => crearTarjeta(p)));
+        mostrarEstado(`GET ${status}: ${postsFiltrados.length} publicaciones mostradas`);
     } catch (error) {
         mostrarEstado(error.message, true);
     }
