@@ -82,15 +82,22 @@ formBuscar.addEventListener('submit', async (e) => {
     }
 });
 
-// 4. POST: crear una publicación
+// Actualización del evento POST de publicaciones (validaciones)
 formCrear.addEventListener('submit', async (e) => {
     e.preventDefault();
-const nuevo = {
-        title: inputTitulo.value.trim(),
-        body: inputCuerpo.value.trim(),
-        userId: Number(inputUsuario.value)
-    };
-    btnCrear.disabled = true;               // evita envíos duplicados
+    const titulo = inputTitulo.value.trim();
+    const cuerpo = inputCuerpo.value.trim();
+
+    // Validar título y contenido
+    if (titulo.length < 5) {
+        return mostrarEstado('Error: El título debe tener al menos 5 caracteres', true);
+    }
+    if (cuerpo === '') {
+        return mostrarEstado('Error: El contenido no puede estar vacío', true);
+    }
+
+    const nuevo = { title: titulo, body: cuerpo, userId: Number(inputUsuario.value) };
+    btnCrear.disabled = true;
     mostrarEstado('Enviando...');
     try {
         const { status, datos } = await peticion(`${API}/posts`, {
@@ -107,6 +114,37 @@ const nuevo = {
         btnCrear.disabled = false;
     }
 });
+
+// Nuevo evento POST para enviar comentarios
+const formComentar = document.querySelector('#form-comentar');
+formComentar.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btnComentar = formComentar.querySelector('button');
+    
+    // Construir cuerpo usando FormData y Object.fromEntries
+    const datosForm = new FormData(formComentar);
+    const cuerpoReq = Object.fromEntries(datosForm);
+    cuerpoReq.postId = Number(cuerpoReq.postId); // Parseo a numero
+
+    btnComentar.disabled = true;
+    mostrarEstado('Enviando comentario...');
+    
+    try {
+        const { status, datos } = await peticion(`${API}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cuerpoReq)
+        });
+        mostrarEstado(`POST ${status}: Comentario creado (ID devuelto: ${datos.id})`);
+        formComentar.reset();
+    } catch (error) {
+        mostrarEstado(error.message, true);
+    } finally {
+        btnComentar.disabled = false;
+    }
+});
+
+
 // leer los parametros de la url
 const query = new URLSearchParams(location.search);
 const nombre = query.get('nombre');
